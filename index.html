@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArcGame | 机密暗信息游戏演示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+        }
+
+        .mono { font-family: 'JetBrains+Mono', monospace; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+        }
+
+        /* 3D 卡牌旋转效果 */
+        .card-inner {
+            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+            position: relative;
+            width: 120px;
+            height: 180px;
+        }
+        .is-flipped { transform: rotateY(180deg); }
+        
+        .card-back, .card-front {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-back {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+            border: 2px solid #60a5fa;
+            color: white;
+        }
+        .card-front {
+            background: #f8fafc;
+            color: #0f172a;
+            transform: rotateY(180deg);
+            border: 4px solid #3b82f6;
+        }
+
+        @keyframes pulse-mxe {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            70% { box-shadow: 0 0 0 20px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .mxe-active { animation: pulse-mxe 2s infinite; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+
+        /* 锁定状态样式 */
+        input:disabled, button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-12 px-6">
+
+    <!-- Header -->
+    <header class="w-full max-w-5xl flex justify-between items-center mb-16">
+        <div class="flex items-center gap-4">
+            <div class="bg-blue-600 p-2.5 rounded-2xl shadow-xl shadow-blue-500/20">
+                <i class="fas fa-mask text-white text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black tracking-tighter">ArcGame <span class="text-blue-500 font-normal mono text-sm ml-1">v1.0</span></h1>
+                <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold">Confidential Fog of War Engine</p>
+            </div>
+        </div>
+        <div class="flex flex-col items-end">
+            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Network Authority</span>
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="text-xs font-bold text-slate-300">Cluster 456 Active</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-10">
+        
+        <!-- Game Interface -->
+        <div class="lg:col-span-8 space-y-8">
+            <div id="gameBoard" class="glass-panel rounded-[2.5rem] p-12 relative overflow-hidden flex flex-col items-center justify-between min-h-[600px] border-t-4 border-blue-500">
+                
+                <!-- Opponent Section -->
+                <div class="flex flex-col items-center gap-4">
+                    <div class="flex items-center gap-2 text-slate-500 uppercase tracking-widest text-[10px] font-black">
+                        <i class="fas fa-ghost"></i> Opponent (Shielded Hand)
+                    </div>
+                    <div class="flex gap-4">
+                        <div class="card-inner">
+                            <div class="card-back"><i class="fas fa-fingerprint text-blue-300 text-3xl opacity-30"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Central Battle Hub -->
+                <div id="battleZone" class="flex flex-col items-center justify-center py-10 z-10">
+                    <div id="idleState" class="text-center space-y-4">
+                        <div class="w-20 h-20 rounded-full border-4 border-slate-800 flex items-center justify-center mx-auto">
+                            <i class="fas fa-bolt text-slate-800 text-2xl"></i>
+                        </div>
+                        <p class="text-[10px] text-slate-600 uppercase font-black tracking-widest">Ready for Turn Resolution</p>
+                    </div>
+
+                    <div id="mxeState" class="hidden flex flex-col items-center space-y-8">
+                        <div class="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center mxe-active shadow-2xl shadow-blue-500/30">
+                            <i class="fas fa-brain text-white text-3xl"></i>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="font-black text-blue-400 uppercase tracking-[0.4em] text-xs">同态逻辑执行中...</h3>
+                            <p class="text-[10px] mono text-slate-500 mt-2" id="statusMsg">Comparing ciphertexts A vs B...</p>
+                        </div>
+                    </div>
+
+                    <div id="resultState" class="hidden text-center space-y-6 animate-in fade-in zoom-in duration-500">
+                        <h2 id="winnerText" class="text-4xl font-black italic text-white uppercase tracking-tighter">--</h2>
+                        <div class="bg-blue-600/10 px-8 py-3 rounded-2xl border border-blue-500/30">
+                            <p id="damageInfo" class="text-sm font-bold text-blue-400 mono">--</p>
+                        </div>
+                        <button onclick="resetGame()" class="text-[10px] text-slate-600 hover:text-white transition uppercase font-black border-b border-transparent hover:border-white">Next Round</button>
+                    </div>
+                </div>
+
+                <!-- Player Section -->
+                <div class="flex flex-col items-center gap-8">
+                    <div class="flex gap-6 items-center">
+                        <div id="playerCard" class="card-inner">
+                            <div class="card-back"><i class="fas fa-fingerprint text-white text-3xl"></i></div>
+                            <div class="card-front">
+                                <span class="text-[9px] font-black text-blue-500 absolute top-3 left-3 uppercase tracking-tighter">Item: Blade</span>
+                                <i class="fas fa-dagger text-4xl text-blue-600"></i>
+                                <span class="text-3xl font-black mt-4" id="cardValDisplay">15</span>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <label class="block text-[10px] text-slate-500 uppercase font-black tracking-widest">Secret card value</label>
+                            <input type="number" id="cardInput" value="15" class="w-24 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xl focus:border-blue-500 outline-none transition mono text-white">
+                        </div>
+                    </div>
+                    
+                    <button id="playBtn" class="w-full bg-white text-slate-950 font-black py-5 px-16 rounded-2xl hover:bg-blue-50 transition active:scale-[0.98] shadow-2xl flex items-center justify-center gap-3">
+                        <i class="fas fa-shield-halved" id="btnIcon"></i> <span id="btnText">PLAY SHIELDED MOVE</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Telemetry Sidebar -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+            <div class="glass-panel p-8 rounded-[2.5rem] flex-1 flex flex-col overflow-hidden relative shadow-2xl">
+                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-8 flex items-center gap-3">
+                    <i class="fas fa-terminal text-blue-500"></i> MXE Match Telemetry
+                </h3>
+                <div id="liveLogs" class="flex-1 overflow-y-auto custom-scrollbar space-y-3 mono text-[10px] pr-2 text-slate-500">
+                    <!-- Logs Inject Here -->
+                </div>
+                <div class="mt-8 pt-8 border-t border-slate-800 space-y-3">
+                    <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                        <span class="text-slate-600">Program ID</span>
+                        <span class="text-white mono">GCdPcj...G21V8</span>
+                    </div>
+                    <div class="flex justify-between items-center text-[10px] font-black uppercase tracking-widest">
+                        <span class="text-slate-600">Comp Def</span>
+                        <span class="text-white mono">DFXsd1...DkvJN</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-blue-900/10 border border-blue-500/20 p-6 rounded-3xl">
+                <p class="text-[11px] text-slate-400 leading-relaxed italic">
+                    "在加密博弈中，系统不依赖发牌员。逻辑由 MXE 节点在密文空间强制执行，只有最终影响游戏进程的数据才会被解密。这才是真正的链上战争迷雾。"
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-16 text-slate-800 text-[10px] uppercase tracking-[0.5em] font-black italic">
+        ArcGame Infrastructure &copy; 2026 | Powered by Arcium
+    </footer>
+
+    <script>
+        const playBtn = document.getElementById('playBtn');
+        const btnText = document.getElementById('btnText');
+        const btnIcon = document.getElementById('btnIcon');
+        const cardInput = document.getElementById('cardInput');
+        const cardValDisplay = document.getElementById('cardValDisplay');
+        const playerCard = document.getElementById('playerCard');
+        
+        const idleState = document.getElementById('idleState');
+        const mxeState = document.getElementById('mxeState');
+        const resultState = document.getElementById('resultState');
+        const statusMsg = document.getElementById('statusMsg');
+        const liveLogs = document.getElementById('liveLogs');
+        
+        const winnerText = document.getElementById('winnerText');
+        const damageInfo = document.getElementById('damageInfo');
+
+        const mxeSteps = [
+            "Sharding entropy for x25519 session...",
+            "Encrypting card values locally...",
+            "Lifting user intent to SharedEncryptedStruct...",
+            "MXE executing resolve_round circuit...",
+            "Performing homomorphic comparison A > B...",
+            "Calculating confidential damage dealt...",
+            "Sharding result across Recovery Set (Size 4)...",
+            "Broadcasting verified callback to Solana Devnet..."
+        ];
+
+        function addLog(text, color = 'text-slate-500') {
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            const log = document.createElement('div');
+            log.className = `${color} border-l-2 border-transparent pl-2`;
+            log.innerHTML = `<span class="text-slate-800 mr-2">[${time}]</span> ${text}`;
+            liveLogs.prepend(log);
+        }
+
+        playBtn.addEventListener('click', () => {
+            const val = cardInput.value;
+            if(!val) return;
+
+            // 交互锁定：防止提交过程中进行操作
+            playBtn.disabled = true;
+            cardInput.disabled = true;
+            
+            cardValDisplay.innerText = val;
+            playerCard.classList.add('is-flipped');
+            
+            idleState.classList.add('hidden');
+            resultState.classList.add('hidden');
+            mxeState.classList.remove('hidden');
+
+            btnText.innerText = "MXE RESOLVING...";
+            btnIcon.className = "fas fa-spinner fa-spin";
+
+            addLog(`Initiating confidential move: SecretValue(${val})`, "text-blue-400 font-bold");
+
+            let step = 0;
+            const logInterval = setInterval(() => {
+                statusMsg.innerText = mxeSteps[step];
+                addLog(`[MXE] ${mxeSteps[step]}`);
+                step++;
+                if (step >= mxeSteps.length) clearInterval(logInterval);
+            }, 750);
+
+            setTimeout(() => {
+                mxeState.classList.add('hidden');
+                resultState.classList.remove('hidden');
+                
+                // 模拟一个结果：假设对手出 10
+                const opponentVal = 10;
+                const userVal = parseInt(val);
+                
+                if (userVal > opponentVal) {
+                    winnerText.innerText = "Victory: Player A";
+                    winnerText.className = "text-4xl font-black italic text-green-500 uppercase tracking-tighter";
+                    damageInfo.innerText = `DAMAGE DEALT: ${userVal - opponentVal} (Calculated in MXE)`;
+                } else if (userVal < opponentVal) {
+                    winnerText.innerText = "Defeat: Player B";
+                    winnerText.className = "text-4xl font-black italic text-red-500 uppercase tracking-tighter";
+                    damageInfo.innerText = `DAMAGE RECEIVED: ${opponentVal - userVal} (Calculated in MXE)`;
+                } else {
+                    winnerText.innerText = "Draw: Stalemate";
+                    winnerText.className = "text-4xl font-black italic text-slate-400 uppercase tracking-tighter";
+                    damageInfo.innerText = "NO DAMAGE DEALT";
+                }
+
+                addLog("🎉 Round settlement finalized. State hidden from observers.", "text-green-500 font-black");
+                
+                btnText.innerText = "PLAY SHIELDED MOVE";
+                btnIcon.className = "fas fa-shield-halved";
+            }, 6500);
+        });
+
+        function resetGame() {
+            // 解锁操作
+            playBtn.disabled = false;
+            cardInput.disabled = false;
+            
+            resultState.classList.add('hidden');
+            idleState.classList.remove('hidden');
+            playerCard.classList.remove('is-flipped');
+            addLog("System standby. Awaiting next encrypted payload.");
+        }
+
+        addLog("ArcGame Privacy Engine initialized.");
+        addLog("Connected to Arcium Cluster 456 (Devnet).");
+    </script>
+</body>
+</html>
