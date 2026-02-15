@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-arcgame = "8C9qag5tsr6xiqhK8PSj7mh1pDYKbRSp7tP4MLfhVdjc"
+test = "BQSDhw7GcsEUmjW82c15rLeifmU7ckUGkBUhQ4CoCzqP"
 
 [registry]
 url = "https://api.apr.dev"
