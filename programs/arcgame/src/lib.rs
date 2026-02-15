@@ -19,22 +19,22 @@ pub mod arcgame {
         let game = &mut ctx.accounts.game;
         game.player_1 = ctx.accounts.player.key();
         game.turn = 1;
-        game.state = 0; // 0: Waiting for P2 Join/Move
-        msg!("Game lobby created by {}", game.player_1);
+        game.state = 0; // 0: 等待玩家2加入或行动
+        msg!("游戏大厅已由 {} 创建", game.player_1);
         Ok(())
     }
 
-    /// [新增] 加入游戏 (Player 2)
+    /// [新增] 加入游戏 (玩家2)
     pub fn join_game(ctx: Context<JoinGame>) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(game.player_2 == Pubkey::default(), GameError::GameFull);
         game.player_2 = ctx.accounts.player.key();
-        msg!("Player 2 joined: {}", game.player_2);
+        msg!("玩家2加入: {}", game.player_2);
         Ok(())
     }
 
     /// [核心] 提交加密动作
-    /// 玩家提交他们在本地加密好的 Move (Type + Power)
+    /// 玩家提交他们在本地加密好的动作 (类型 + 力量值)
     /// 这些数据以密文形式存储在链上，对手不可见
     pub fn submit_move(
         ctx: Context<SubmitMove>,
@@ -56,7 +56,7 @@ pub mod arcgame {
             return Err(GameError::NotAPlayer.into());
         }
 
-        msg!("Player {} submitted a hidden move.", signer);
+        msg!("玩家 {} 提交了一个隐藏动作。", signer);
         Ok(())
     }
 
@@ -73,14 +73,14 @@ pub mod arcgame {
 
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
         
-        // 构建 MPC 参数: P1 Move + P2 Move
+        // 构建 MPC 参数: 玩家1动作 + 玩家2动作
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            // P1
+            // 玩家1
             .encrypted_u64(game.p1_move_type)
             .encrypted_u64(game.p1_move_power)
-            // P2
+            // 玩家2
             .encrypted_u64(game.p2_move_type)
             .encrypted_u64(game.p2_move_power)
             .build();
@@ -123,8 +123,8 @@ pub mod arcgame {
         game.p2_committed = false;
         game.turn += 1;
 
-        msg!("⚔️ Round Resolved via MPC!");
-        msg!("Winner: Player {}, Damage: {}", winner, dmg);
+        msg!("⚔️ 回合通过 MPC 结算完成！");
+        msg!("胜者: 玩家 {}, 伤害: {}", winner, dmg);
         
         emit!(RoundEndEvent {
             game: game.key(),
@@ -136,7 +136,7 @@ pub mod arcgame {
     }
 }
 
-// --- Accounts ---
+// --- 账户定义 ---
 
 #[derive(Accounts)]
 pub struct CreateGame<'info> {
@@ -174,12 +174,12 @@ pub struct GameState {
     pub player_1: Pubkey,
     pub player_2: Pubkey,
     
-    // P1 Move Storage (Encrypted)
+    // 玩家1动作存储 (加密)
     pub p1_move_type: [u8; 32],
     pub p1_move_power: [u8; 32],
     pub p1_committed: bool,
 
-    // P2 Move Storage (Encrypted)
+    // 玩家2动作存储 (加密)
     pub p2_move_type: [u8; 32],
     pub p2_move_power: [u8; 32],
     pub p2_committed: bool,
@@ -202,13 +202,13 @@ pub struct ResolveTurn<'info> {
     #[account(address = derive_mxe_pda!())]
     pub mxe_account: Box<Account<'info, MXEAccount>>,
     #[account(mut, address = derive_mempool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: Mempool
+    /// 检查: Mempool
     pub mempool_account: UncheckedAccount<'info>,
     #[account(mut, address = derive_execpool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: Execpool
+    /// 检查: Execpool
     pub executing_pool: UncheckedAccount<'info>,
     #[account(mut, address = derive_comp_pda!(computation_offset, mxe_account, ErrorCode::ClusterNotSet))]
-    /// CHECK: Comp
+    /// 检查: Comp
     pub computation_account: UncheckedAccount<'info>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_GAME))]
     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
@@ -230,14 +230,14 @@ pub struct ResolveDuelCallback<'info> {
     pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
     #[account(address = derive_mxe_pda!())]
     pub mxe_account: Box<Account<'info, MXEAccount>>,
-    /// CHECK: Comp
+    /// 检查: Comp
     pub computation_account: UncheckedAccount<'info>,
     #[account(mut)]
     pub game: Account<'info, GameState>,
     #[account(address = derive_cluster_pda!(mxe_account, ErrorCode::ClusterNotSet))]
     pub cluster_account: Account<'info, Cluster>,
     #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
-    /// CHECK: Sysvar
+    /// 检查: Sysvar
     pub instructions_sysvar: AccountInfo<'info>,
 }
 
@@ -249,13 +249,13 @@ pub struct InitConfig<'info> {
     #[account(mut, address = derive_mxe_pda!())]
     pub mxe_account: Box<Account<'info, MXEAccount>>,
     #[account(mut)]
-    /// CHECK: Def
+    /// 检查: Def
     pub comp_def_account: UncheckedAccount<'info>,
     #[account(mut, address = derive_mxe_lut_pda!(mxe_account.lut_offset_slot))]
-    /// CHECK: LUT
+    /// 检查: LUT
     pub address_lookup_table: UncheckedAccount<'info>,
     #[account(address = LUT_PROGRAM_ID)]
-    /// CHECK: LUT Prog
+    /// 检查: LUT 程序
     pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
@@ -271,13 +271,13 @@ pub struct RoundEndEvent {
 
 #[error_code]
 pub enum ErrorCode {
-    #[msg("Aborted")] AbortedComputation,
-    #[msg("No Cluster")] ClusterNotSet,
+    #[msg("计算中止")] AbortedComputation,
+    #[msg("未设置集群")] ClusterNotSet,
 }
 
 #[error_code]
 pub enum GameError {
-    #[msg("Game is full")] GameFull,
-    #[msg("Not a player in this game")] NotAPlayer,
-    #[msg("Waiting for other player to move")] WaitingForMoves,
+    #[msg("游戏已满")] GameFull,
+    #[msg("不是该游戏的玩家")] NotAPlayer,
+    #[msg("等待其他玩家行动")] WaitingForMoves,
 }

@@ -71,6 +71,12 @@
             opacity: 0.5;
             cursor: not-allowed !important;
         }
+        
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center py-12 px-6">
@@ -127,12 +133,12 @@
                             <i class="fas fa-brain text-white text-3xl"></i>
                         </div>
                         <div class="text-center">
-                            <h3 class="font-black text-blue-400 uppercase tracking-[0.4em] text-xs">同态逻辑执行中...</h3>
-                            <p class="text-[10px] mono text-slate-500 mt-2" id="statusMsg">Comparing ciphertexts A vs B...</p>
+                            <h3 class="font-black text-blue-400 uppercase tracking-[0.4em] text-xs">MPC 逻辑执行中...</h3>
+                            <p class="text-[10px] mono text-slate-500 mt-2" id="statusMsg">Comparing secret shares A vs B...</p>
                         </div>
                     </div>
 
-                    <div id="resultState" class="hidden text-center space-y-6 animate-in fade-in zoom-in duration-500">
+                    <div id="resultState" class="hidden text-center space-y-6 fade-in">
                         <h2 id="winnerText" class="text-4xl font-black italic text-white uppercase tracking-tighter">--</h2>
                         <div class="bg-blue-600/10 px-8 py-3 rounded-2xl border border-blue-500/30">
                             <p id="damageInfo" class="text-sm font-bold text-blue-400 mono">--</p>
@@ -220,7 +226,7 @@
             "Encrypting card values locally...",
             "Lifting user intent to SharedEncryptedStruct...",
             "MXE executing resolve_round circuit...",
-            "Performing homomorphic comparison A > B...",
+            "Performing oblivious comparison A > B...",
             "Calculating confidential damage dealt...",
             "Sharding result across Recovery Set (Size 4)...",
             "Broadcasting verified callback to Solana Devnet..."

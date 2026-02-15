@@ -5,12 +5,12 @@ mod battle_engine {
     use arcis::*;
 
     pub struct PlayerMove {
-        pub action_type: u64, // 1=Attack(攻), 2=Defend(防), 3=Break(破)
+        pub action_type: u64, // 1=攻击, 2=防御, 3=破防
         pub power: u64,       // 力量值
     }
 
     pub struct BattleResult {
-        pub winner: u64,      // 1=P1胜, 2=P2胜, 0=平局
+        pub winner: u64,      // 1=玩家1胜, 2=玩家2胜, 0=平局
         pub damage: u64,      // 造成的伤害值
     }
 
@@ -22,10 +22,10 @@ mod battle_engine {
         let a = move_a_ctxt.to_arcis();
         let b = move_b_ctxt.to_arcis();
 
-        // --- 核心博弈逻辑 (Rock-Paper-Scissors 变体) ---
-        // 1(攻) > 3(破)
-        // 3(破) > 2(防)
-        // 2(防) > 1(攻)
+        // --- 核心博弈逻辑 (石头剪刀布变体) ---
+        // 1(攻击) > 3(破防)
+        // 3(破防) > 2(防御)
+        // 2(防御) > 1(攻击)
 
         // 判定 A 是否因属性克制获胜
         let a_type_wins = 
@@ -46,7 +46,7 @@ mod battle_engine {
         let a_power_wins = a.power > b.power;
         let b_power_wins = b.power > a.power;
 
-        // --- 最终胜负 Mux ---
+        // --- 最终胜负选择器 ---
         let (winner, raw_dmg) = if a_type_wins {
             (1u64, a.power) // 克制直接造成全额伤害
         } else {
@@ -56,7 +56,7 @@ mod battle_engine {
                 // 同属性，拼点数
                 if same_type {
                     if a_power_wins {
-                        (1u64, a.power - b.power) // 拼刀，伤害抵消
+                        (1u64, a.power - b.power) // 拼点，伤害抵消
                     } else {
                         if b_power_wins {
                             (2u64, b.power - a.power)
@@ -65,7 +65,7 @@ mod battle_engine {
                         }
                     }
                 } else {
-                    (0u64, 0u64) // 理论不可达，但也设为平局
+                    (0u64, 0u64) // 理论上不可达，但也设为平局
                 }
             }
         };
