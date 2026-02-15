@@ -1,48 +1,81 @@
 use arcis::*;
 
 #[encrypted]
-mod card_battle_engine {
+mod battle_engine {
     use arcis::*;
 
-    pub struct GameState {
-        pub player_a_card: u64, // 加密的手牌 A
-        pub player_b_card: u64, // 加密的手牌 B
+    pub struct PlayerMove {
+        pub action_type: u64, // 1=Attack(攻), 2=Defend(防), 3=Break(破)
+        pub power: u64,       // 力量值
     }
 
-    pub struct RoundResult {
-        pub winner_id: u64,    // 1 = A 赢, 2 = B 赢, 0 = 平局
-        pub damage_dealt: u64, // 基于数值差额计算的机密伤害
+    pub struct BattleResult {
+        pub winner: u64,      // 1=P1胜, 2=P2胜, 0=平局
+        pub damage: u64,      // 造成的伤害值
     }
 
     #[instruction]
-    pub fn resolve_round(
-        state_ctxt: Enc<Shared, GameState>
-    ) -> Enc<Shared, RoundResult> {
-        let state = state_ctxt.to_arcis();
-        
-        let a_val = state.player_a_card;
-        let b_val = state.player_b_card;
+    pub fn resolve_duel(
+        move_a_ctxt: Enc<Shared, PlayerMove>,
+        move_b_ctxt: Enc<Shared, PlayerMove>
+    ) -> Enc<Shared, BattleResult> {
+        let a = move_a_ctxt.to_arcis();
+        let b = move_b_ctxt.to_arcis();
 
-        // 执行同态比较逻辑
-        let a_wins = a_val > b_val;
-        let b_wins = b_val > a_val;
+        // --- 核心博弈逻辑 (Rock-Paper-Scissors 变体) ---
+        // 1(攻) > 3(破)
+        // 3(破) > 2(防)
+        // 2(防) > 1(攻)
 
-        // 使用 V4 规范的 if-else Mux 链判定胜者
-        let (winner, damage) = if a_wins {
-            (1u64, a_val - b_val)
+        // 判定 A 是否因属性克制获胜
+        let a_type_wins = 
+            (a.action_type == 1 && b.action_type == 3) ||
+            (a.action_type == 3 && b.action_type == 2) ||
+            (a.action_type == 2 && b.action_type == 1);
+
+        // 判定 B 是否因属性克制获胜
+        let b_type_wins = 
+            (b.action_type == 1 && a.action_type == 3) ||
+            (b.action_type == 3 && a.action_type == 2) ||
+            (b.action_type == 2 && a.action_type == 1);
+
+        // 判定是否同属性
+        let same_type = a.action_type == b.action_type;
+
+        // 同属性时比较力量值
+        let a_power_wins = a.power > b.power;
+        let b_power_wins = b.power > a.power;
+
+        // --- 最终胜负 Mux ---
+        let (winner, raw_dmg) = if a_type_wins {
+            (1u64, a.power) // 克制直接造成全额伤害
         } else {
-            if b_wins {
-                (2u64, b_val - a_val)
+            if b_type_wins {
+                (2u64, b.power)
             } else {
-                (0u64, 0u64) // 平局
+                // 同属性，拼点数
+                if same_type {
+                    if a_power_wins {
+                        (1u64, a.power - b.power) // 拼刀，伤害抵消
+                    } else {
+                        if b_power_wins {
+                            (2u64, b.power - a.power)
+                        } else {
+                            (0u64, 0u64) // 完全平局
+                        }
+                    }
+                } else {
+                    (0u64, 0u64) // 理论不可达，但也设为平局
+                }
             }
         };
 
-        let result = RoundResult {
-            winner_id: winner,
-            damage_dealt: damage,
+        let result = BattleResult {
+            winner,
+            damage: raw_dmg,
         };
 
-        state_ctxt.owner.from_arcis(result)
+        // 结果加密返回给 Solana 上的游戏裁判程序
+        move_a_ctxt.owner.from_arcis(result)
     }
 }
